@@ -1,8 +1,20 @@
 import React, { useEffect, useState } from 'react';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { 
+  Activity, 
+  Wifi, 
+  Shield, 
+  Globe, 
+  Cpu, 
+  Radio, 
+  AlertTriangle,
+  Zap
+} from 'lucide-react';
 
 function App() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
+  const [history, setHistory] = useState([]);
 
   const fetchData = () => {
     fetch('http://localhost:8080/health')
@@ -13,6 +25,14 @@ function App() {
       .then(jsonData => {
         setData(jsonData);
         setError(null);
+        
+        // Update History for Graph
+        setHistory(prev => {
+           const now = new Date();
+           const timeLabel = `${now.getHours()}:${now.getMinutes()}:${now.getSeconds()}`;
+           const newData = [...prev, { time: timeLabel, latency: jsonData.latency_ms }];
+           return newData.slice(-20); // Keep last 20 points
+        });
       })
       .catch(err => {
         setError(err.message);
@@ -22,115 +42,219 @@ function App() {
 
   useEffect(() => {
     fetchData(); // Initial fetch
-    const interval = setInterval(fetchData, 2000); // Poll every 2s
+    const interval = setInterval(fetchData, 1000); // Faster polling for smooth graph
     return () => clearInterval(interval);
   }, []);
 
+  // Cyberpunk Styles
+  const styles = {
+    container: {
+      width: '100vw',
+      minHeight: '100vh',
+      backgroundColor: '#0a0a0f',
+      color: '#e0e0e0',
+      padding: '2rem',
+      boxSizing: 'border-box',
+    },
+    header: {
+      marginBottom: '2rem',
+      borderBottom: '1px solid #333',
+      paddingBottom: '1rem',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center'
+    },
+    title: {
+      fontSize: '2rem',
+      fontWeight: 'bold',
+      background: 'linear-gradient(45deg, #00f2ff, #00c3ff)',
+      WebkitBackgroundClip: 'text',
+      WebkitTextFillColor: 'transparent',
+      margin: 0,
+      letterSpacing: '1px'
+    },
+    grid: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+      gap: '20px',
+      marginBottom: '20px'
+    },
+    card: {
+      background: 'rgba(20, 20, 30, 0.6)',
+      border: '1px solid #333',
+      borderRadius: '12px',
+      padding: '20px',
+      backdropFilter: 'blur(10px)',
+      boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
+      transition: 'transform 0.2s, border-color 0.2s',
+    },
+    value: {
+      fontSize: '1.8rem',
+      fontWeight: 'bold',
+      margin: '10px 0',
+      fontFamily: 'monospace'
+    },
+    label: {
+      color: '#888',
+      fontSize: '0.9rem',
+      textTransform: 'uppercase',
+      letterSpacing: '1px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px'
+    },
+    btn: {
+        background: 'linear-gradient(45deg, #2196F3, #21CBF3)',
+        border: 'none',
+        borderRadius: '4px',
+        padding: '8px 16px',
+        color: 'white',
+        cursor: 'pointer',
+        fontWeight: 'bold',
+        marginTop: '10px',
+        width: '100%',
+        textTransform: 'uppercase',
+        letterSpacing: '1px'
+    },
+    btnDanger: {
+        background: 'linear-gradient(45deg, #FF5252, #FF1744)',
+    },
+    btnChaos: {
+        background: 'linear-gradient(45deg, #9C27B0, #E040FB)',
+    }
+  };
+
   return (
-    <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif', maxWidth: '800px', margin: '0 auto' }}>
-      <h1>AAR Dashboard <span style={{fontSize: '0.6em', color: '#666'}}>(MVP Phase 1)</span></h1>
-      
+    <div style={styles.container}>
+      <div style={styles.header}>
+        <div>
+           <h1 style={styles.title}>AAR <span style={{fontSize: '0.5em', color: '#555'}}>// AUTONOMOUS ADAPTIVE ROUTER</span></h1>
+           <div style={{color: '#666', fontSize: '0.8rem', marginTop: '5px'}}>SYSTEM STATUS: ONLINE</div>
+        </div>
+        <div style={{textAlign: 'right'}}>
+            <Activity color="#00f2ff" />
+        </div>
+      </div>
+
       {error && (
-        <div style={{ padding: '15px', background: '#ffebee', color: '#c62828', borderRadius: '5px', marginBottom: '20px' }}>
-          <strong>Error:</strong> {error}
-          <p style={{margin: '5px 0 0 0', fontSize: '0.9em'}}>Make sure the backend is running (<code>go run main.go</code>)</p>
+        <div style={{...styles.card, borderColor: '#ff4444', color: '#ff4444', marginBottom: '20px'}}>
+          <AlertTriangle size={20} style={{marginRight: '10px', verticalAlign: 'middle'}}/>
+          <strong>CONNECTION LOST:</strong> {error}
         </div>
       )}
 
       {data && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
-          
-          <Card title="System Status" value={data.status} color="#2e7d32" />
-          
-          <Card 
-            title="Internet Connectivity" 
-            value={data.connectivity ? "Online" : "Offline"} 
-            color={data.connectivity ? "#2e7d32" : "#c62828"} 
-          />
-          
-          <Card 
-            title="Latency (Google DNS)" 
-            value={`${data.latency_ms} ms`} 
-            color={data.latency_ms < 50 ? "#2e7d32" : data.latency_ms < 150 ? "#f57c00" : "#c62828"} 
-          />
-          
-          <Card 
-            title="Active WAN Interface" 
-            value={data.active_wan} 
-            color="#0288d1" 
-          />
+        <>
+            {/* Top Metrics Row */}
+            <div style={styles.grid}>
+                <Card style={styles.card}>
+                    <div style={styles.label}><Globe size={16}/> Internet Status</div>
+                    <div style={{...styles.value, color: data.connectivity ? '#00e676' : '#ff1744'}}>
+                        {data.connectivity ? "ONLINE" : "OFFLINE"}
+                    </div>
+                    <div style={{fontSize: '0.8rem', color: '#666'}}>
+                        WAN Interface: <span style={{color: '#fff'}}>{data.active_wan}</span>
+                    </div>
+                </Card>
 
-          <Card
-            title="Wi-Fi Health"
-            value={`Ch ${data.wifi_channel} (${data.wifi_quality}%)`}
-            color={data.wifi_quality > 70 ? "#2e7d32" : data.wifi_quality > 40 ? "#f57c00" : "#c62828"}
-          />
+                <Card style={styles.card}>
+                    <div style={styles.label}><Wifi size={16}/> Wi-Fi Health</div>
+                    <div style={{...styles.value, color: getQualityColor(data.wifi_quality)}}>
+                        {data.wifi_quality}%
+                    </div>
+                    <div style={{fontSize: '0.8rem', color: '#666'}}>
+                        Channel: <span style={{color: '#fff'}}>{data.wifi_channel}</span>
+                    </div>
+                </Card>
 
-          <Card 
-            title="VPN Status" 
-            value={data.vpn_status} 
-            color={data.vpn_status === "Connected" ? "#1565c0" : "#757575"}
-            action={
-              <button 
-                onClick={toggleVPN}
-                style={{
-                  marginTop: '10px',
-                  padding: '8px 16px',
-                  backgroundColor: data.vpn_status === "Connected" ? '#ef5350' : '#4caf50',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer'
-                }}
-              >
-                {data.vpn_status === "Connected" ? 'Simulate Kill Switch' : 'Enable VPN'}
-              </button>
-            }
-          />
+                <Card style={styles.card}>
+                    <div style={styles.label}><Shield size={16}/> VPN Tunnel</div>
+                    <div style={{...styles.value, color: data.vpn_status === "Connected" ? '#2979ff' : '#757575'}}>
+                        {data.vpn_status.toUpperCase()}
+                    </div>
+                    <button 
+                        onClick={toggleVPN}
+                        style={{...styles.btn, ...(data.vpn_status === "Connected" ? styles.btnDanger : {})}}
+                    >
+                        {data.vpn_status === "Connected" ? 'DISENGAGE' : 'INITIALIZE'}
+                    </button>
+                </Card>
 
-          {/* Chaos Tool */}
-          <Card 
-            title="Chaos Engineering" 
-            value="Simulate Lag" 
-            color="#8e24aa"
-            action={
-              <button 
-                onClick={toggleChaos}
-                style={{
-                  marginTop: '10px',
-                  padding: '8px 16px',
-                  backgroundColor: '#ab47bc',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer'
-                }}
-              >
-                Inject 500ms Latency
-              </button>
-            }
-          />
-        </div>
+                <Card style={styles.card}>
+                    <div style={styles.label}><Zap size={16}/> Chaos Engineering</div>
+                    <div style={{...styles.value, color: '#e040fb'}}>TEST MODE</div>
+                    <button onClick={toggleChaos} style={{...styles.btn, ...styles.btnChaos}}>
+                        INJECT LATENCY (500ms)
+                    </button>
+                </Card>
+            </div>
+
+            {/* Real-time Graph */}
+            <div style={{...styles.card, height: '300px', marginBottom: '20px'}}>
+                <div style={styles.label}><Activity size={16}/> Real-Time Latency (ms)</div>
+                <div style={{width: '100%', height: '100%', marginTop: '10px'}}>
+                    <ResponsiveContainer width="100%" height="90%">
+                        <LineChart data={history}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                            <XAxis dataKey="time" stroke="#666" tick={{fill: '#666', fontSize: 10}} />
+                            <YAxis stroke="#666" tick={{fill: '#666', fontSize: 10}}/>
+                            <Tooltip 
+                                contentStyle={{backgroundColor: '#0d1117', borderColor: '#333', color: '#fff'}}
+                                itemStyle={{color: '#00f2ff'}}
+                            />
+                            <Line 
+                                type="monotone" 
+                                dataKey="latency" 
+                                stroke="#00f2ff" 
+                                strokeWidth={2} 
+                                dot={false} 
+                                activeDot={{ r: 6, fill: '#fff' }}
+                                isAnimationActive={false}
+                            />
+                        </LineChart>
+                    </ResponsiveContainer>
+                </div>
+            </div>
+
+            {/* System Log / Footer */}
+             <div style={{...styles.card, fontSize: '0.8rem', color: '#666'}}>
+                <div style={styles.label}><Cpu size={16}/> System Engine</div>
+                <div style={{marginTop: '10px'}}>
+                    Auto-Pilot Version: <strong>v0.1.0-alpha</strong> | Strategy: <strong>Latency-Drift-Correction</strong>
+                    <br/>
+                    Current Latency: <strong style={{color: '#fff'}}>{data.latency_ms}ms</strong>
+                </div>
+             </div>
+        </>
       )}
 
-      {!data && !error && <p>Loading system metrics...</p>}
+      {!data && !error && (
+        <div style={{textAlign: 'center', marginTop: '50px', color: '#666'}}>
+            <div className="loading-spinner"></div>
+            CONNECTING TO NEURAL NET...
+        </div>
+      )}
     </div>
   );
 
+  function getQualityColor(q) {
+      if (q > 70) return '#00e676';
+      if (q > 40) return '#ffea00';
+      return '#ff1744';
+  }
+
   function toggleVPN() {
     fetch('http://localhost:8080/vpn/toggle', { method: 'POST' })
-      .then(() => fetchData()) // Refresh data immediately
-      .catch(err => console.error("VPN Toggle Error", err));
+      .then(() => fetchData()) 
+      .catch(err => console.error("VPN Error", err));
   }
 
   function toggleChaos() {
-    // Enable lag to force the engine to react
     fetch('http://localhost:8080/chaos/lag', { 
       method: 'POST',
       body: JSON.stringify({ enable: true })
     }).catch(err => console.error("Chaos Error", err));
 
-    // Automatically disable it after 10 seconds so the system can "recover"
     setTimeout(() => {
         fetch('http://localhost:8080/chaos/lag', { 
             method: 'POST',
@@ -140,16 +264,12 @@ function App() {
   }
 }
 
-function Card({ title, value, color, action }) {
-  return (
-    <div style={{ padding: '20px', border: '1px solid #ddd', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-      <h3 style={{ margin: '0 0 10px 0', fontSize: '1em', color: '#555' }}>{title}</h3>
-      <div style={{ fontSize: '1.5em', fontWeight: 'bold', color: color }}>
-        {value}
-      </div>
-      {action && <div>{action}</div>}
-    </div>
-  );
+function Card({children, style}) {
+    return (
+        <div style={style}>
+            {children}
+        </div>
+    )
 }
 
 export default App;
