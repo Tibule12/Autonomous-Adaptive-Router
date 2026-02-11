@@ -87,6 +87,29 @@ function App() {
               </button>
             }
           />
+
+          {/* Chaos Tool */}
+          <Card 
+            title="Chaos Engineering" 
+            value="Simulate Lag" 
+            color="#8e24aa"
+            action={
+              <button 
+                onClick={toggleChaos}
+                style={{
+                  marginTop: '10px',
+                  padding: '8px 16px',
+                  backgroundColor: '#ab47bc',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                Inject 500ms Latency
+              </button>
+            }
+          />
         </div>
       )}
 
@@ -98,6 +121,22 @@ function App() {
     fetch('http://localhost:8080/vpn/toggle', { method: 'POST' })
       .then(() => fetchData()) // Refresh data immediately
       .catch(err => console.error("VPN Toggle Error", err));
+  }
+
+  function toggleChaos() {
+    // Enable lag to force the engine to react
+    fetch('http://localhost:8080/chaos/lag', { 
+      method: 'POST',
+      body: JSON.stringify({ enable: true })
+    }).catch(err => console.error("Chaos Error", err));
+
+    // Automatically disable it after 10 seconds so the system can "recover"
+    setTimeout(() => {
+        fetch('http://localhost:8080/chaos/lag', { 
+            method: 'POST',
+            body: JSON.stringify({ enable: false })
+        }).catch(err => console.error("Chaos Reset Error", err));
+    }, 12000);
   }
 }
 

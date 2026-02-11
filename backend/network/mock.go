@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-type MockManager struct{
+type MockManager struct {
 	activeWAN      string
 	vpnActive      bool
 	currentChannel int
@@ -32,7 +32,7 @@ func (m *MockManager) GetLatency(target string) (int64, error) {
 	// Simulate different performance for Primary vs Backup
 	// Primary: Low latency, but occasional spikes (that trigger failover)
 	// Backup: Higher consistent latency
-	
+
 	var latency int64
 	if m.activeWAN == "wan1_primary" {
 		// Mostly good (20-40ms), sometimes terrible (150ms+) to trigger Engine
@@ -45,7 +45,7 @@ func (m *MockManager) GetLatency(target string) (int64, error) {
 		// Backup is slower but stable (80-100ms)
 		latency = int64(rand.Intn(20) + 80)
 	}
-	
+
 	// fmt.Printf("[SIMULATION] Pinging %s via %s... %dms\n", target, m.activeWAN, latency)
 	return latency, nil
 }
@@ -98,7 +98,7 @@ func (m *MockManager) GetWifiInfo() (int, int, error) {
 	// Simulate signal quality fluctuating
 	// Allow it to drop low to trigger optimization
 	quality := rand.Intn(30) + 70 // 70-100 normally
-	
+
 	// Occasionally simulate terrible congestion on Channel 6 (default)
 	if m.currentChannel == 6 && rand.Intn(10) > 6 {
 		quality = 30 // Bad quality
@@ -110,11 +110,11 @@ func (m *MockManager) GetWifiInfo() (int, int, error) {
 func (m *MockManager) ScanWifiChannels() ([]WifiChannel, error) {
 	fmt.Println("[SIMULATION] 📡 Scanning Wi-Fi Spectrum...")
 	time.Sleep(1 * time.Second) // Fake scan delay
-	
+
 	// Simulate scan results (Score 0-100, higher is better)
 	return []WifiChannel{
 		{Channel: 1, Score: 85},
-		{Channel: 6, Score: 40}, // Congested!
+		{Channel: 6, Score: 40},  // Congested!
 		{Channel: 11, Score: 92}, // Good candidate
 		{Channel: 36, Score: 95},
 		{Channel: 161, Score: 98},
@@ -127,4 +127,8 @@ func (m *MockManager) SetWifiChannel(channel int) error {
 	m.currentChannel = channel
 	fmt.Printf("[SIMULATION] ✅ Wi-Fi now operating on Channel %d\n", channel)
 	return nil
+}
+
+func (m *MockManager) SetSimulatedLag(enabled bool) {
+	fmt.Printf("[SIMULATION] Toggling Fake Lag: %v\n", enabled)
 }

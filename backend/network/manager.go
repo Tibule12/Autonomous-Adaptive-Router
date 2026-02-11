@@ -15,7 +15,7 @@ type Manager interface {
 	// Interface Management
 	ListInterfaces() ([]string, error)
 	RestartInterface(name string) error
-	
+
 	// Multi-WAN Management
 	GetActiveWAN() (string, error)
 	SwitchWAN(wanInterface string) error
@@ -29,6 +29,9 @@ type Manager interface {
 	GetWifiInfo() (int, int, error) // Returns (currentChannel, signalQuality 0-100)
 	ScanWifiChannels() ([]WifiChannel, error)
 	SetWifiChannel(channel int) error
+
+	// Chaos Engineering (Simulation)
+	SetSimulatedLag(enabled bool)
 }
 
 // NewManager creates a platform-specific network manager.

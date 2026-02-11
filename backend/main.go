@@ -34,7 +34,7 @@ func main() {
 	// The real monitoring is now done inside the engine.
 	var currentLatency int64
 	var wifiCh, wifiQual int
-	
+
 	// Separate loop just for the dashboard API data updates
 	go func() {
 		for {
@@ -43,7 +43,7 @@ func main() {
 			if err != nil {
 				// Ignore metric errors for the dashboard ticker
 			}
-			
+
 			wifiCh, wifiQual, _ = netMgr.GetWifiInfo()
 
 			time.Sleep(2 * time.Second)
@@ -68,7 +68,7 @@ func main() {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		
+
 		json.NewEncoder(w).Encode(resp)
 	})
 
@@ -76,7 +76,7 @@ func main() {
 	http.HandleFunc("/vpn/toggle", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-		
+
 		if r.Method == "OPTIONS" {
 			return
 		}
@@ -104,6 +104,30 @@ func main() {
 		}
 
 		json.NewEncoder(w).Encode(map[string]string{"status": newState})
+	})
+
+	// Chaos Control API
+	http.HandleFunc("/chaos/lag", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+
+		if r.Method == "OPTIONS" {
+			return
+		}
+
+		type ChaosRequest struct {
+			Enable bool `json:"enable"`
+		}
+		var req ChaosRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		netMgr.SetSimulatedLag(req.Enable)
+		fmt.Printf("[API] Chaos Lag set to: %v\n", req.Enable)
+
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 	})
 
 	fmt.Println("Server listening on :8080")

@@ -11,13 +11,15 @@ import (
 )
 
 type LinuxManager struct {
-	mu       sync.Mutex
-	vpnState string
+	mu           sync.Mutex
+	vpnState     string
+	simulatedLag bool
 }
 
 func getPlatformManager() Manager {
 	return &LinuxManager{
-		vpnState: "Disconnected",
+		vpnState:     "Disconnected",
+		simulatedLag: false,
 	}
 }
 
@@ -33,6 +35,17 @@ func (m *LinuxManager) CheckConnectivity() (bool, error) {
 }
 
 func (m *LinuxManager) GetLatency(target string) (int64, error) {
+	// Chaos/Testing Mode
+	m.mu.Lock()
+	isLagging := m.simulatedLag
+	m.mu.Unlock()
+
+	if isLagging {
+		// Simulate a bad connection (500ms+) to trigger the Engine
+		time.Sleep(500 * time.Millisecond)
+		return 500, nil
+	}
+
 	// Simple latency check via ping output parsing is complex in Go without a library.
 	// For MVP, we will measure the time it takes to execute the command.
 
@@ -68,16 +81,28 @@ func (m *LinuxManager) ListInterfaces() ([]string, error) {
 }
 
 func (m *LinuxManager) RestartInterface(name string) error {
-	// 'ip link set <name> down'
-	cmdDown := exec.Command("ip", "link", "set", name, "down")
+	m.mu.Lock()
+	isLagging := m.simulatedLag
+	m.mu.Unlock()
+
+	// If we are in Chaos Mode, don't actually kill the interface (it would kill the demo!)
+	if isLagging {
+		fmt.Printf("[LINUX] 🧪 SIMULATION: Pretending to restart interface %s...\n", name)
+		time.Sleep(2 * time.Second) // Simulate down time
+		return nil
+	}
+
+	// Real Mode: 'ip link set <name> down'
+	// Note: This requires sudo in WSL
+	cmdDown := exec.Command("sudo", "ip", "link", "set", name, "down")
 	if err := cmdDown.Run(); err != nil {
-		return err
+		return fmt.Errorf("failed to shut down interface (sudo required?): %v", err)
 	}
 
 	time.Sleep(1 * time.Second)
 
 	// 'ip link set <name> up'
-	cmdUp := exec.Command("ip", "link", "set", name, "up")
+	cmdUp := exec.Command("sudo", "ip", "link", "set", name, "up")
 	return cmdUp.Run()
 }
 
@@ -130,4 +155,10 @@ func (m *LinuxManager) ScanWifiChannels() ([]WifiChannel, error) {
 func (m *LinuxManager) SetWifiChannel(channel int) error {
 	// Real: 'hostapd_cli chan_switch' or 'iw config'
 	return nil
+}
+
+func (m *LinuxManager) SetSimulatedLag(enabled bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.simulatedLag = enabled
 }
