@@ -1,0 +1,13 @@
+[Unit]
+Description=AAR Control Daemon
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/aar-daemon
+Restart=always
+# Running as root is typically required for network interface manipulation
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  aar-backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: aar_backend
+    network_mode: "host" # CRITICAL: Allows container to see real Network Interfaces (eth0, wlan0)
+    privileged: true     # CRITICAL: Allows modifying network settings (ip link, wg)
+    restart: unless-stopped
+    volumes:
+      - /etc/wireguard:/etc/wireguard # Share WireGuard Configs
+    environment:
+      - AAR_ENV=production
+
+  aar-frontend:
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: aar_frontend
+    restart: unless-stopped
+    ports:
+      - "80:80" # Dashboard accessible on standard HTTP port
