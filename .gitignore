@@ -1,0 +1,28 @@
+# Binaries
+/backend/aar-daemon
+/backend/aar-daemon-linux-arm64
+*.exe
+*.dll
+
+# Dependencies
+/frontend/node_modules/
+/backend/vendor/
+
+# Build Output
+/frontend/dist/
+/frontend/build/
+*.so
+*.check
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+*.swp
