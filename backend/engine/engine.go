@@ -26,7 +26,7 @@ func NewAutoPilot(mgr network.Manager) *AutoPilot {
 	return &AutoPilot{
 		manager: mgr,
 		config: Config{
-			MaxLatencyMs:      80, // Threshold: 80ms
+			MaxLatencyMs:      200, // Threshold: 200ms (tuned for WSL/WiFi jitter)
 			CheckInterval:     3 * time.Second,
 			StabilityDuration: 3, // React after 3 bad checks
 		},
@@ -56,21 +56,28 @@ func (ap *AutoPilot) controlLoop() {
 func (ap *AutoPilot) evaluateNetwork() {
 	// 1. Monitor Latency
 	latency, err := ap.manager.GetLatency("8.8.8.8")
+
+	// Handling Total Network Failure (Ping Failed)
 	if err != nil {
-		fmt.Printf("[ENGINE] Error evaluating latency: %v\n", err)
-		return
+		fmt.Printf("[ENGINE] ❌ CRITICAL: Internet Unreachable (Ping Failed)\n")
+		// Treat this as max latency to force a failure streak increment
+		latency = 9999
+	} else {
+		// Valid measurement
+		// fmt.Printf("[ENGINE] Latency: %dms\n", latency)
 	}
-	
+
 	activeWAN, _ := ap.manager.GetActiveWAN()
 
 	// 2. Decide
 	if latency > ap.config.MaxLatencyMs {
 		ap.failureStreak++
-		fmt.Printf("[ENGINE] ⚠️ High Latency on %s: %dms (Streak: %d/%d)\n", 
+		fmt.Printf("[ENGINE] ⚠️ Abnormal Network State on %s: %dms (Streak: %d/%d)\n",
 			activeWAN, latency, ap.failureStreak, ap.config.StabilityDuration)
 	} else {
+		// Recovery Logic: If we were failing, and now we are good, announce it loudly.
 		if ap.failureStreak > 0 {
-			fmt.Println("[ENGINE] ✅ Network stabilized.")
+			fmt.Printf("[ENGINE] ✅ CONNECTION RESTORED. Latency: %dms. Reseting failure counter.\n", latency)
 		}
 		ap.failureStreak = 0
 	}
@@ -85,7 +92,7 @@ func (ap *AutoPilot) evaluateNetwork() {
 func (ap *AutoPilot) triggerRecovery(currentLatency int64, activeWAN string) {
 	fmt.Println("------------------------------------------------")
 	fmt.Printf("[ENGINE] 🚨 ACTION REQUIRED | Latency %dms exceeded threshold\n", currentLatency)
-	
+
 	if activeWAN == "wan1_primary" {
 		fmt.Println("[ENGINE] 🔄 FAILOVER STRATEGY: Switching to Backup WAN...")
 		err := ap.manager.SwitchWAN("wan2_backup")
@@ -117,7 +124,7 @@ func (ap *AutoPilot) optimizeWifi() {
 	if quality < 40 {
 		fmt.Printf("[ENGINE] ⚠️ Wi-Fi Quality degraded on Channel %d (Score: %d/100)\n", currentChannel, quality)
 		fmt.Println("[ENGINE] 📡 Initiating Intelligent Channel Optimization...")
-		
+
 		bestChannel := ap.findBestChannel()
 		if bestChannel != -1 && bestChannel != currentChannel {
 			err := ap.manager.SetWifiChannel(bestChannel)

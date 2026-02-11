@@ -6,13 +6,19 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"sync"
 	"time"
 )
 
-type LinuxManager struct{}
+type LinuxManager struct {
+	mu       sync.Mutex
+	vpnState string
+}
 
 func getPlatformManager() Manager {
-	return &LinuxManager{}
+	return &LinuxManager{
+		vpnState: "Disconnected",
+	}
 }
 
 func (m *LinuxManager) CheckConnectivity() (bool, error) {
@@ -29,15 +35,23 @@ func (m *LinuxManager) CheckConnectivity() (bool, error) {
 func (m *LinuxManager) GetLatency(target string) (int64, error) {
 	// Simple latency check via ping output parsing is complex in Go without a library.
 	// For MVP, we will measure the time it takes to execute the command.
-	start := time.Now()
-	cmd := exec.Command("ping", "-c", "1", "-W", "1", target)
-	err := cmd.Run()
-	duration := time.Since(start).Milliseconds()
 
-	if err != nil {
-		return 0, fmt.Errorf("ping failed")
+	// Retry up to 2 times to prevent flaky logs in WSL/WiFi
+	for i := 0; i < 2; i++ {
+		start := time.Now()
+		// -c 1: count 1, -W 2: timeout 2s
+		cmd := exec.Command("ping", "-c", "1", "-W", "2", target)
+		err := cmd.Run()
+		duration := time.Since(start).Milliseconds()
+
+		if err == nil {
+			return duration, nil
+		}
+		// Brief pause before retry
+		time.Sleep(200 * time.Millisecond)
 	}
-	return duration, nil
+
+	return 0, fmt.Errorf("ping failed")
 }
 
 func (m *LinuxManager) ListInterfaces() ([]string, error) {
@@ -78,17 +92,29 @@ func (m *LinuxManager) SwitchWAN(wanInterface string) error {
 }
 
 func (m *LinuxManager) EnableVPN() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	// Real implementation: 'wg-quick up wg0'
+	// For now, we simulate the state change so the UI works
+	m.vpnState = "Connected"
 	return nil
 }
 
 func (m *LinuxManager) DisableVPN() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	// Real implementation: 'wg-quick down wg0'
+	m.vpnState = "Disconnected"
 	return nil
 }
 
 func (m *LinuxManager) GetVPNStatus() (string, error) {
-	return "Active", nil
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.vpnState == "" {
+		return "Disconnected", nil
+	}
+	return m.vpnState, nil
 }
 
 func (m *LinuxManager) GetWifiInfo() (int, int, error) {
