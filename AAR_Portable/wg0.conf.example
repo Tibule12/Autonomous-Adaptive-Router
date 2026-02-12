@@ -1,0 +1,29 @@
+# FA-AAR WireGuard Configuration Template
+# ----------------------------------------------------------------
+# INSTRUCTIONS:
+# 1. You need a VPN provider (e.g., Mullvad, ProtonVPN) or your own server.
+# 2. Get your "WireGuard Configuration" from them.
+# 3. Replace the placeholders below (<...>) with your actual keys.
+# 4. On Linux, copy this file to: /etc/wireguard/wg0.conf
+#    (Command: sudo cp wg0.conf /etc/wireguard/wg0.conf)
+# ----------------------------------------------------------------
+
+[Interface]
+# Your Private Key (Keep this secret!)
+PrivateKey = <YOUR_PRIVATE_KEY_HERE>
+
+# The IP address your VPN provider gives you
+Address = 10.66.66.2/32,fd42:42:42::2/128
+
+# DNS Servers (Cloudflare or your VPN's DNS)
+DNS = 1.1.1.1, 1.0.0.1
+
+[Peer]
+# The Server's Public Key
+PublicKey = <SERVER_PUBLIC_KEY_HERE>
+
+# The Server's IP Address and Port
+Endpoint = <SERVER_IP_ADDRESS>:51820
+
+# Route ALL traffic through VPN (0.0.0.0/0)
+AllowedIPs = 0.0.0.0/0, ::/0

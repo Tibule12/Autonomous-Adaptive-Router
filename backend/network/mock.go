@@ -9,17 +9,27 @@ import (
 )
 
 type MockManager struct {
-	activeWAN      string
-	vpnActive      bool
-	currentChannel int
+	activeWAN                 string
+	vpnActive                 bool
+	currentChannel            int
+	simulatedLag              bool
+	simulatedLoss             bool
+	simulatedWiFiInterference bool
+	trafficType               string
+	currentLoad               int // Requests per second
 }
 
 func getPlatformManager() Manager {
 	fmt.Println("[SIMULATION] Initializing Mock Network Manager (Windows/Mac Mode)")
 	return &MockManager{
-		activeWAN:      "wan1_primary",
-		vpnActive:      true,
-		currentChannel: 6,
+		activeWAN:                 "wan1_primary",
+		vpnActive:                 true,
+		currentChannel:            6,
+		simulatedLag:              false,
+		simulatedLoss:             false,
+		simulatedWiFiInterference: false,
+		trafficType:               "Default",
+		currentLoad:               0,
 	}
 }
 
@@ -28,26 +38,41 @@ func (m *MockManager) CheckConnectivity() (bool, error) {
 	return true, nil
 }
 
-func (m *MockManager) GetLatency(target string) (int64, error) {
-	// Simulate different performance for Primary vs Backup
-	// Primary: Low latency, but occasional spikes (that trigger failover)
-	// Backup: Higher consistent latency
-
-	var latency int64
-	if m.activeWAN == "wan1_primary" {
-		// Mostly good (20-40ms), sometimes terrible (150ms+) to trigger Engine
-		if rand.Intn(10) > 7 {
-			latency = int64(rand.Intn(100) + 120) // Spike!
-		} else {
-			latency = int64(rand.Intn(20) + 20)
-		}
-	} else {
-		// Backup is slower but stable (80-100ms)
-		latency = int64(rand.Intn(20) + 80)
+func (m *MockManager) GetNetworkMetrics(target string) (NetworkMetrics, error) {
+	// Logic to return bad metrics if chaos mode is on
+	// Base metrics
+	metrics := NetworkMetrics{
+		LatencyMs:  45,
+		PacketLoss: 0.0,
+		JitterMs:   5,
 	}
 
-	// fmt.Printf("[SIMULATION] Pinging %s via %s... %dms\n", target, m.activeWAN, latency)
-	return latency, nil
+	// 1. Apply High Traffic (DDoS/Stress) Effects
+	// 50 reps/sec is the threshold in this simulation
+	if m.currentLoad > 0 {
+		// Log scale impact: more requests = exponential latency
+		metrics.LatencyMs += int64(m.currentLoad * 2)
+		metrics.JitterMs += int64(m.currentLoad / 2)
+
+		if m.currentLoad > 50 {
+			metrics.PacketLoss += 5.0
+			m.trafficType = "High Load"
+		}
+		if m.currentLoad > 100 {
+			metrics.PacketLoss += 15.0
+			m.trafficType = "Congestion"
+		}
+	}
+
+	if m.simulatedLoss {
+		metrics.PacketLoss = 25.0
+	}
+
+	if m.simulatedLag {
+		metrics.LatencyMs = 500
+	}
+
+	return metrics, nil
 }
 
 func (m *MockManager) ListInterfaces() ([]string, error) {
@@ -99,6 +124,11 @@ func (m *MockManager) GetWifiInfo() (int, int, error) {
 	// Allow it to drop low to trigger optimization
 	quality := rand.Intn(30) + 70 // 70-100 normally
 
+	// Chaos: Massive interference forces quality down
+	if m.simulatedWiFiInterference {
+		quality = 25 // Critical interference
+	}
+
 	// Occasionally simulate terrible congestion on Channel 6 (default)
 	if m.currentChannel == 6 && rand.Intn(10) > 6 {
 		quality = 30 // Bad quality
@@ -111,14 +141,24 @@ func (m *MockManager) ScanWifiChannels() ([]WifiChannel, error) {
 	fmt.Println("[SIMULATION] 📡 Scanning Wi-Fi Spectrum...")
 	time.Sleep(1 * time.Second) // Fake scan delay
 
-	// Simulate scan results (Score 0-100, higher is better)
-	return []WifiChannel{
+	// Base Candidates
+	candidates := []WifiChannel{
 		{Channel: 1, Score: 85},
 		{Channel: 6, Score: 40},  // Congested!
 		{Channel: 11, Score: 92}, // Good candidate
 		{Channel: 36, Score: 95},
 		{Channel: 161, Score: 98},
-	}, nil
+	}
+
+	// Dynamic Adjustment based on simulation state
+	for i := range candidates {
+		// If Jamming is active, the CURRENT channel is garbage
+		if m.simulatedWiFiInterference && candidates[i].Channel == m.currentChannel {
+			candidates[i].Score = 20 // Crushed by interference
+		}
+	}
+
+	return candidates, nil
 }
 
 func (m *MockManager) SetWifiChannel(channel int) error {
@@ -129,6 +169,37 @@ func (m *MockManager) SetWifiChannel(channel int) error {
 	return nil
 }
 
+func (m *MockManager) SetSimulatedLoad(requestsPerSecond int) {
+	m.currentLoad = requestsPerSecond
+	if requestsPerSecond > 10 {
+		fmt.Printf("[SIMULATION] ⚠️ High Traffic Detected: %d req/sec\n", requestsPerSecond)
+	}
+
+	// Auto-Detect Gaming Traffic based on "signature" if simulated
+	// We'll simulate this by saying if traffic type is explicitly set to Gaming, we enforce it.
+	// In a real router, this would be packet inspection (DPI).
+}
+
+func (m *MockManager) SetSimulatedTraffic(trafficType string) {
+	m.trafficType = trafficType
+	fmt.Printf("[SIMULATION] Traffic Pattern Changed: %s\n", trafficType)
+}
+
+func (m *MockManager) SetSimulatedInterference(enabled bool) {
+	m.simulatedWiFiInterference = enabled
+	fmt.Printf("[SIMULATION] Toggling Fake Wi-Fi Interference: %v\n", enabled)
+}
+
 func (m *MockManager) SetSimulatedLag(enabled bool) {
+	m.simulatedLag = enabled
 	fmt.Printf("[SIMULATION] Toggling Fake Lag: %v\n", enabled)
+}
+
+func (m *MockManager) SetSimulatedPacketLoss(enabled bool) {
+	m.simulatedLoss = enabled
+	fmt.Printf("[SIMULATION] Toggling Fake Packet Loss: %v\n", enabled)
+}
+
+func (m *MockManager) GetTrafficAnalysis() (string, error) {
+	return m.trafficType, nil
 }

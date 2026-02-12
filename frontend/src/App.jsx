@@ -8,13 +8,29 @@ import {
   Cpu, 
   Radio, 
   AlertTriangle,
-  Zap
+  Zap,
+  Server,
+  Smartphone,
+  Cloud
 } from 'lucide-react';
 
 function App() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [history, setHistory] = useState([]);
+  const [logs, setLogs] = useState([]);
+
+  // Fetch History ONCE on load
+  useEffect(() => {
+    fetch('http://localhost:8080/history')
+        .then(res => res.json())
+        .then(jsonHistory => {
+            if (jsonHistory && jsonHistory.length > 0) {
+                setHistory(jsonHistory);
+            }
+        })
+        .catch(console.error);
+  }, []);
 
   const fetchData = () => {
     fetch('http://localhost:8080/health')
@@ -28,16 +44,31 @@ function App() {
         
         // Update History for Graph
         setHistory(prev => {
+           // If we already have history from the API that is fresher, rely on that
+           // Only append if the last timestamp is different
            const now = new Date();
            const timeLabel = `${now.getHours()}:${now.getMinutes()}:${now.getSeconds()}`;
-           const newData = [...prev, { time: timeLabel, latency: jsonData.latency_ms }];
-           return newData.slice(-20); // Keep last 20 points
+           
+           // Simple duplicate check or just append
+           const newData = [...prev, { 
+               time: timeLabel, 
+               latency: jsonData.latency_ms,
+               loss: jsonData.packet_loss,
+               packet_loss: jsonData.packet_loss
+           }];
+           return newData.slice(-50); // Keep last 50 points
         });
       })
       .catch(err => {
         setError(err.message);
         setData(null);
       });
+      
+    // Fetch Logs
+    fetch('http://localhost:8080/logs')
+      .then(res => res.json())
+      .then(jsonLogs => setLogs(jsonLogs || []))
+      .catch(console.error);
   };
 
   useEffect(() => {
@@ -121,6 +152,23 @@ function App() {
     },
     btnChaos: {
         background: 'linear-gradient(45deg, #9C27B0, #E040FB)',
+    },
+    terminal: {
+        fontFamily: "'Courier New', monospace",
+        background: '#0d1117',
+        border: '1px solid #333',
+        borderRadius: '8px',
+        padding: '15px',
+        height: '200px',
+        overflowY: 'auto',
+        fontSize: '0.85rem',
+        marginTop: '20px',
+        boxShadow: 'inset 0 0 10px rgba(0,0,0,0.5)'
+    },
+    logEntry: {
+        marginBottom: '4px',
+        display: 'flex',
+        gap: '10px'
     }
   };
 
@@ -153,7 +201,7 @@ function App() {
                         {data.connectivity ? "ONLINE" : "OFFLINE"}
                     </div>
                     <div style={{fontSize: '0.8rem', color: '#666'}}>
-                        WAN Interface: <span style={{color: '#fff'}}>{data.active_wan}</span>
+                        WAN: <span style={{color: '#fff'}}>{data.active_wan}</span> | Loss: <span style={{color: data.packet_loss > 0 ? '#ff1744' : '#00e676'}}>{data.packet_loss}%</span>
                     </div>
                 </Card>
 
@@ -182,30 +230,74 @@ function App() {
 
                 <Card style={styles.card}>
                     <div style={styles.label}><Zap size={16}/> Chaos Engineering</div>
-                    <div style={{...styles.value, color: '#e040fb'}}>TEST MODE</div>
-                    <button onClick={toggleChaos} style={{...styles.btn, ...styles.btnChaos}}>
-                        INJECT LATENCY (500ms)
-                    </button>
+                    <div style={{display: 'flex', gap: '5px'}}>
+                        <button onClick={() => toggleChaos('lag')} style={{...styles.btn, ...styles.btnChaos, flex: 1}}>
+                            DoS (Lag)
+                        </button>
+                        <button onClick={() => toggleChaos('loss')} style={{...styles.btn, ...styles.btnChaos, flex: 1, borderColor: '#ff1744', color: '#ff1744'}}>
+                            CUT (Loss)
+                        </button>
+                        <button onClick={() => toggleChaos('interference')} style={{...styles.btn, ...styles.btnChaos, flex: 1, borderColor: '#FFD740', color: '#FFD740'}}>
+                            JAM (Wifi)
+                        </button>
+                    </div>
+                </Card>
+
+                {/* AI / Traffic CARD */}
+                <Card style={styles.card}>
+                     <div style={styles.label}><Cpu size={16}/> Traffic Intelligence</div>
+                     <div style={{...styles.value, fontSize: '1.2rem', color: '#aa00ff'}}>
+                        {data.traffic_type || "DEFAULT"}
+                     </div>
+                     <div style={{display: 'flex', gap: '5px', marginTop: '10px'}}>
+                        <button onClick={() => setTraffic('Gaming')} style={{...styles.btn, flex: 1, fontSize: '0.7rem'}}>GAME</button>
+                        <button onClick={() => setTraffic('Streaming')} style={{...styles.btn, flex: 1, fontSize: '0.7rem'}}>STREAM</button>
+                        <button onClick={() => setTraffic('Default')} style={{...styles.btn, flex: 1, fontSize: '0.7rem'}}>IDLE</button>
+                     </div>
                 </Card>
             </div>
 
+            {/* Network Topology Map */}
+            <div style={{...styles.card, marginBottom: '20px'}}>
+                <div style={styles.label}><Globe size={16}/> Active Topology</div>
+                <TopologyMap 
+                    activeWan={data.active_wan} 
+                    trafficType={data.traffic_type} 
+                    packetLoss={data.packet_loss}
+                />
+            </div>
+
             {/* Real-time Graph */}
-            <div style={{...styles.card, height: '300px', marginBottom: '20px'}}>
-                <div style={styles.label}><Activity size={16}/> Real-Time Latency (ms)</div>
-                <div style={{width: '100%', height: '100%', marginTop: '10px'}}>
-                    <ResponsiveContainer width="100%" height="90%">
+            <div style={{...styles.card, height: '320px', marginBottom: '20px', display: 'flex', flexDirection: 'column'}}>
+                <div style={styles.label}><Activity size={16}/> Real-Time Metrics</div>
+                <div style={{flexGrow: 1, height: '100%', minHeight: '200px', width: '100%', marginTop: '10px'}}>
+                    <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={history}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#333" />
                             <XAxis dataKey="time" stroke="#666" tick={{fill: '#666', fontSize: 10}} />
-                            <YAxis stroke="#666" tick={{fill: '#666', fontSize: 10}}/>
+                            <YAxis yAxisId="left" stroke="#666" tick={{fill: '#666', fontSize: 10}} label={{ value: 'ms', angle: -90, position: 'insideLeft', fill: '#666' }}/>
+                            <YAxis yAxisId="right" orientation="right" stroke="#666" tick={{fill: '#666', fontSize: 10}} domain={[0, 100]} label={{ value: '%', angle: 90, position: 'insideRight', fill: '#666' }}/>
                             <Tooltip 
                                 contentStyle={{backgroundColor: '#0d1117', borderColor: '#333', color: '#fff'}}
                                 itemStyle={{color: '#00f2ff'}}
                             />
                             <Line 
+                                yAxisId="left"
                                 type="monotone" 
                                 dataKey="latency" 
                                 stroke="#00f2ff" 
+                                name="Latency (ms)"
+                                strokeWidth={2} 
+                                dot={false} 
+                                activeDot={{ r: 6, fill: '#fff' }}
+                                isAnimationActive={false}
+                            />
+                             <Line 
+                                yAxisId="right"
+                                type="monotone" 
+                                dataKey="packet_loss"
+                                stroke="#ff1744" 
+                                name="Packet Loss (%)"
                                 strokeWidth={2} 
                                 dot={false} 
                                 activeDot={{ r: 6, fill: '#fff' }}
@@ -213,6 +305,26 @@ function App() {
                             />
                         </LineChart>
                     </ResponsiveContainer>
+                </div>
+            </div>
+
+            {/* System Intelligence Console */}
+            <div style={{...styles.card, height: '250px', marginBottom: '20px', display: 'flex', flexDirection: 'column', overflow: 'hidden'}}>
+                <div style={styles.label}><Cpu size={16}/> System Intelligence Console</div>
+                <div style={styles.terminal}>
+                    {logs.length === 0 && <div style={{color: '#444'}}>Waiting for system events...</div>}
+                    {logs.map((log, i) => (
+                        <div key={i} style={styles.logEntry}>
+                            <span style={{color: '#555'}}>[{log.timestamp}]</span>
+                            <span style={{
+                                color: log.level === 'ERROR' ? '#ff1744' : 
+                                       log.level === 'WARN' ? '#ffea00' : 
+                                       log.level === 'SUCCESS' ? '#00e676' : '#00b0ff',
+                                fontWeight: 'bold'
+                            }}>{log.level}</span>
+                            <span style={{color: '#ddd'}}>{log.message}</span>
+                        </div>
+                    )).reverse()} 
                 </div>
             </div>
 
@@ -249,19 +361,81 @@ function App() {
       .catch(err => console.error("VPN Error", err));
   }
 
-  function toggleChaos() {
+  function toggleChaos(type) {
     fetch('http://localhost:8080/chaos/lag', { 
       method: 'POST',
-      body: JSON.stringify({ enable: true })
+      body: JSON.stringify({ enable: true, type: type })
     }).catch(err => console.error("Chaos Error", err));
 
     setTimeout(() => {
         fetch('http://localhost:8080/chaos/lag', { 
             method: 'POST',
-            body: JSON.stringify({ enable: false })
+            body: JSON.stringify({ enable: false, type: type })
         }).catch(err => console.error("Chaos Reset Error", err));
     }, 12000);
   }
+
+  function setTraffic(type) {
+    fetch('http://localhost:8080/simulation/traffic', { 
+      method: 'POST',
+      body: JSON.stringify({ type: type })
+    }).catch(err => console.error("Traffic Error", err));
+  }
+}
+
+function TopologyMap({ activeWan, trafficType, packetLoss }) {
+    const isWan1 = activeWan && (activeWan.includes('wan1') || activeWan.includes('primary'));
+    const isWan2 = activeWan && (activeWan.includes('wan2') || activeWan.includes('latency'));
+    
+    // Animation color based on status
+    const pathColor = packetLoss > 10 ? '#ff1744' : '#00e676';
+    const idleColor = '#333';
+
+    return (
+        <div style={{position: 'relative', height: '150px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 40px'}}>
+            {/* Device Node */}
+            <div style={{zIndex: 10, textAlign: 'center'}}>
+                <Smartphone size={32} color="#fff" />
+                <div style={{fontSize: '0.7rem', marginTop: '5px', color: '#888'}}>LOCAL</div>
+            </div>
+
+            {/* SVG Lines */}
+            <div style={{position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none'}}>
+                <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
+                    {/* Path to Router */}
+                    <line x1="10" y1="50" x2="45" y2="50" stroke={pathColor} strokeWidth="0.5" strokeDasharray="2,2">
+                         <animate attributeName="stroke-dashoffset" from="10" to="0" dur="1s" repeatCount="indefinite" />
+                    </line>
+
+                    {/* Path Router -> WAN 1 (Top) */}
+                    <path d="M 55 50 C 65 50, 75 30, 90 30" stroke={isWan1 ? pathColor : idleColor} strokeWidth={isWan1 ? "1" : "0.5"} fill="none" />
+                    
+                    {/* Path Router -> WAN 2 (Bottom) */}
+                    <path d="M 55 50 C 65 50, 75 70, 90 70" stroke={isWan2 ? pathColor : idleColor} strokeWidth={isWan2 ? "1" : "0.5"} fill="none" />
+                </svg>
+            </div>
+
+            {/* Router Node */}
+            <div style={{zIndex: 10, textAlign: 'center'}}>
+                <div style={{background: '#0d1117', padding: '10px', borderRadius: '50%', border: `2px solid ${pathColor}`}}>
+                    <Cpu size={32} color={pathColor} />
+                </div>
+                <div style={{fontSize: '0.7rem', marginTop: '5px', color: '#888'}}>AAR CORE</div>
+            </div>
+
+            {/* WAN Nodes */}
+            <div style={{display: 'flex', flexDirection: 'column', gap: '40px', zIndex: 10}}>
+                <div style={{textAlign: 'center', opacity: isWan1 ? 1 : 0.3}}>
+                    <Cloud size={24} color={isWan1 ? "#2196F3" : "#555"} />
+                    <div style={{fontSize: '0.6rem', color: '#888'}}>WAN 1 (DOCSIS)</div>
+                </div>
+                <div style={{textAlign: 'center', opacity: isWan2 ? 1 : 0.3}}>
+                    <Cloud size={24} color={isWan2 ? "#ab47bc" : "#555"} />
+                    <div style={{fontSize: '0.6rem', color: '#888'}}>WAN 2 (FIBER)</div>
+                </div>
+            </div>
+        </div>
+    );
 }
 
 function Card({children, style}) {
