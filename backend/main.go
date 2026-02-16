@@ -208,6 +208,47 @@ func main() {
 		json.NewEncoder(w).Encode(storage.GetHistory())
 	})
 
+	// Connected Devices API (GET / POST)
+	http.HandleFunc("/api/devices", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE")
+		w.Header().Set("Content-Type", "application/json")
+
+		if r.Method == "OPTIONS" {
+			return
+		}
+
+		if r.Method == "GET" {
+			devices, err := netMgr.GetConnectedDevices()
+			if err != nil {
+				json.NewEncoder(w).Encode([]network.Device{})
+				return
+			}
+			json.NewEncoder(w).Encode(devices)
+			return
+		}
+
+		// Handle BLOCK/UNBLOCK via POST/DELETE
+		type DeviceAction struct {
+			MAC    string `json:"mac"`
+			Action string `json:"action"` // "block" or "unblock"
+		}
+		var req DeviceAction
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		if req.Action == "block" {
+			netMgr.BlockDevice(req.MAC)
+			logger.Info("Blocked device: %s", req.MAC)
+		} else {
+			netMgr.UnblockDevice(req.MAC)
+			logger.Info("Unblocked device: %s", req.MAC)
+		}
+		json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+	})
+
 	// Serve Frontend (Robust check for Portable vs Dev mode)
 	var frontendDir string
 	if _, err := os.Stat("./frontend_dist"); err == nil {

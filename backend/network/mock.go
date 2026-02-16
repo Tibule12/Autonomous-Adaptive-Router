@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"math/rand"
 	"time"
+
+	"github.com/TMtshwelo/aar/pkg/storage"
 )
 
 type MockManager struct {
@@ -16,11 +18,24 @@ type MockManager struct {
 	simulatedLoss             bool
 	simulatedWiFiInterference bool
 	trafficType               string
-	currentLoad               int // Requests per second
+	currentLoad               int      // Requests per second
+	connectedDevices          []Device // Mock devices for UI testing
 }
 
 func getPlatformManager() Manager {
 	fmt.Println("[SIMULATION] Initializing Mock Network Manager (Windows/Mac Mode)")
+	devList := []Device{
+		{Name: "Dad's iPhone", IP: "192.168.1.10", MAC: "00:1A:2B:3C:4D:5E"},
+		{Name: "Living Room TV", IP: "192.168.1.15", MAC: "11:22:33:44:55:66"},
+		{Name: "PlayStation 5", IP: "192.168.1.20", MAC: "AA:BB:CC:DD:EE:FF"}, // Check persistence for block
+		{Name: "Unknown Device", IP: "192.168.1.50", MAC: "CA:FE:BA:BE:00:11"},
+	}
+
+	// Dynamic Persistence Check
+	for i := range devList {
+		devList[i].IsBlocked = storage.IsBlocked(devList[i].MAC)
+	}
+
 	return &MockManager{
 		activeWAN:                 "wan1_primary",
 		vpnActive:                 true,
@@ -28,6 +43,7 @@ func getPlatformManager() Manager {
 		simulatedLag:              false,
 		simulatedLoss:             false,
 		simulatedWiFiInterference: false,
+		connectedDevices:          devList, // Injected persistent state
 		trafficType:               "Default",
 		currentLoad:               0,
 	}
@@ -116,6 +132,41 @@ func (m *MockManager) GetVPNStatus() (string, error) {
 	}
 	return "Disconnected", nil
 }
+
+// --- Device Management (SIMULATED) ---
+func (m *MockManager) GetConnectedDevices() ([]Device, error) {
+	return m.connectedDevices, nil
+}
+
+func (m *MockManager) BlockDevice(mac string) error {
+	fmt.Printf("[MOCK] 🚫 Device Blocked: %s\n", mac)
+	// Persist for next restart
+	storage.AddBlockedMAC(mac)
+
+	// Update Runtime Memory
+	for i, dev := range m.connectedDevices {
+		if dev.MAC == mac {
+			m.connectedDevices[i].IsBlocked = true
+		}
+	}
+	return nil
+}
+
+func (m *MockManager) UnblockDevice(mac string) error {
+	fmt.Printf("[MOCK] ✅ Device Unblocked: %s\n", mac)
+	// Persist for next restart
+	storage.RemoveBlockedMAC(mac)
+
+	// Update Runtime Memory
+	for i, dev := range m.connectedDevices {
+		if dev.MAC == mac {
+			m.connectedDevices[i].IsBlocked = false
+		}
+	}
+	return nil
+}
+
+// Wi-Fi Mock Implementation
 
 // Wi-Fi Mock Implementation
 

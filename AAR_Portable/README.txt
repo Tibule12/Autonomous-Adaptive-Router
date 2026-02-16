@@ -1,24 +1,35 @@
 AAR Portable Deployment
 ========================
 
-This folder contains everything needed to run the Autonomous Adaptive Router (AAR) on Windows or Linux.
+This folder contains everything needed to run the Autonomous Adaptive Router (AAR).
 
 Windows Usage:
 --------------
-1. Double-click run.bat to start the router.
-2. The browser will open automatically to the dashboard.
+Double-click 'run.bat'.
 
 Linux Usage:
 ------------
-1. Copy this folder to your Linux machine.
-2. Follow the detailed instructions in LINUX_GUIDE.md.
-   - Run 'chmod +x aar_router_linux'
-   - Broadcast Signal: './start_hotspot.sh'
-   - Start Router: 'sudo ./aar_router_linux'
-   - (Optional) Configure VPN: Edit 'wg0.conf.example' with your provider's keys.
+Linux prevents double-clicking programs by default for security.
+You usually need to utilize the Terminal.
 
-Network Requirements:
----------------------
-- Windows: No special requirements (simulation mode included).
-- Linux: Needs 'sudo' permissions and 'wireguard-tools' installed for real operations.
+Option 1: The Terminal (Recommended)
+1. Right-click inside this folder > 'Open in Terminal'
+2. Type: ./run_linux.sh
+
+Option 2: Try Double-Clicking
+1. Right-click 'run_linux.sh' -> Properties -> Permissions -> Check 'Allow executing file as program'.
+2. Now you can try double-clicking it (select 'Run in Terminal' if asked).
+
+VPN Configuration:
+------------------
+See 'wg0.conf.example' to set up privacy features.
+
+DOWNLOAD LINKS (Before you travel):
+----------------------------------
+If your target laptop doesn't have Linux yet:
+- Ubuntu Desktop: https://ubuntu.com/download/desktop
+
+Most tools (commands like 'ip', 'iw') are built-in, but 'WireGuard' might be missing.
+If that laptop has NO internet, download this package now and put it on the USB:
+- WireGuard Tools: https://packages.ubuntu.com/jammy/wireguard-tools
 

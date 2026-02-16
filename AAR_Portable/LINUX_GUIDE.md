@@ -1,4 +1,7 @@
-# Linux Deployment Guide for AAR
+## 0. Prerequisites (If Linux is NOT installed)
+If your laptop still runs Windows, you must install Linux first.
+- **Download Ubuntu:** [https://ubuntu.com/download/desktop](https://ubuntu.com/download/desktop)
+- **Guide:** [How to Install Ubuntu](https://ubuntu.com/tutorials/install-ubuntu-desktop)
 
 ## 1. Copy Files
 Copy this entire folder (`AAR_Portable`) to your Linux machine (e.g., to `~/AAR_Portable`).
@@ -14,17 +17,23 @@ Make the router executable:
 chmod +x aar_router_linux
 ```
 
-## 3. Dependencies
-The router needs these standard Linux tools to control the network:
-- `ip` (iproute2)
-- `iw` (wireless tools)
-- `wg-quick` (WireGuard)
+## 3. Dependencies (Required Tools)
+The router needs these standard Linux tools to control the network.
 
-You can install them (on Debian/Ubuntu/Kali) with:
+**If you have internet on the Linux Laptop:**
+Run this command in the terminal:
 ```bash
 sudo apt update
-sudo apt install iproute2 iw wireguard-tools
+sudo apt install iproute2 iw wireguard-tools iptables network-manager
 ```
+
+**If you have NO internet on that laptop:**
+You cannot "click a link" on a laptop with no internet. You must download .deb packages on *this* computer and transfer them.
+However, 99% of Linux installations (Ubuntu/Mint) come with everything except `wireguard-tools` pre-installed.
+
+- **WireGuard Tools** (Only if apt install fails):
+  [https://packages.ubuntu.com/jammy/wireguard-tools](https://packages.ubuntu.com/jammy/wireguard-tools)
+
 
 ## 4. Run the Router
 The router needs `sudo` privileges to change network settings and switch Wi-Fi channels.

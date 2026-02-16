@@ -19,6 +19,7 @@ function App() {
   const [error, setError] = useState(null);
   const [history, setHistory] = useState([]);
   const [logs, setLogs] = useState([]);
+  const [devices, setDevices] = useState([]);
 
   // Fetch History ONCE on load
   useEffect(() => {
@@ -68,6 +69,12 @@ function App() {
     fetch('http://localhost:8080/logs')
       .then(res => res.json())
       .then(jsonLogs => setLogs(jsonLogs || []))
+      .catch(console.error);
+      
+    // Fetch Devices (New)
+    fetch('http://localhost:8080/api/devices')
+      .then(res => res.json())
+      .then(jsonDevices => setDevices(jsonDevices || []))
       .catch(console.error);
   };
 
@@ -257,6 +264,41 @@ function App() {
                 </Card>
             </div>
 
+            {/* Connected Devices Grid (NEW) */}
+            <h3 style={{...styles.title, fontSize: '1.2rem', marginBottom: '1rem'}}><Smartphone size={20} style={{verticalAlign: 'bottom'}}/> Connected Clients</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px', marginBottom: '20px' }}>
+                {devices.map((dev, i) => (
+                    <div key={i} style={{
+                        ...styles.card, 
+                        display: 'flex', 
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        borderColor: dev.is_blocked ? '#ff1744' : '#333',
+                        opacity: dev.is_blocked ? 0.6 : 1
+                    }}>
+                        <div>
+                            <div style={{fontWeight: 'bold', color: '#fff'}}>{dev.name}</div>
+                            <div style={{fontSize: '0.8rem', color: '#666'}}>{dev.ip}</div>
+                            <div style={{fontSize: '0.7rem', color: '#444', fontFamily: 'monospace'}}>{dev.mac}</div>
+                        </div>
+                        <button 
+                            onClick={() => toggleBlockDevice(dev.mac, dev.is_blocked)}
+                            style={{
+                                background: 'transparent',
+                                border: '1px solid',
+                                borderColor: dev.is_blocked ? '#00e676' : '#ff1744',
+                                color: dev.is_blocked ? '#00e676' : '#ff1744',
+                                padding: '5px 10px',
+                                cursor: 'pointer',
+                                fontSize: '0.7rem'
+                            }}
+                        >
+                            {dev.is_blocked ? 'UNBLOCK' : 'BLOCK'}
+                        </button>
+                    </div>
+                ))}
+            </div>
+
             {/* Network Topology Map */}
             <div style={{...styles.card, marginBottom: '20px'}}>
                 <div style={styles.label}><Globe size={16}/> Active Topology</div>
@@ -380,6 +422,16 @@ function App() {
       method: 'POST',
       body: JSON.stringify({ type: type })
     }).catch(err => console.error("Traffic Error", err));
+  }
+  
+  function toggleBlockDevice(mac, isCurrentlyBlocked) {
+    const action = isCurrentlyBlocked ? 'unblock' : 'block';
+    fetch('http://localhost:8080/api/devices', { 
+        method: 'POST',
+        body: JSON.stringify({ mac: mac, action: action })
+    })
+    .then(() => fetchData()) // Refresh list
+    .catch(err => console.error("Block Error", err));
   }
 }
 

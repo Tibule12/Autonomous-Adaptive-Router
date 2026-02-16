@@ -5,6 +5,14 @@ type WifiChannel struct {
 	Score   int // 0-100 (100 is best quality/least execution)
 }
 
+// Device represents a connected client (Phone, Laptop, etc.)
+type Device struct {
+	Name      string `json:"name"`
+	IP        string `json:"ip"`
+	MAC       string `json:"mac"`
+	IsBlocked bool   `json:"is_blocked"`
+}
+
 type NetworkMetrics struct {
 	LatencyMs  int64
 	PacketLoss float64 // Percentage 0.0 - 100.0
@@ -30,6 +38,11 @@ type Manager interface {
 	EnableVPN() error
 	DisableVPN() error
 	GetVPNStatus() (string, error)
+
+	// Device Management (NEW)
+	GetConnectedDevices() ([]Device, error)
+	BlockDevice(mac string) error
+	UnblockDevice(mac string) error
 
 	// Wi-Fi Management
 	SetSimulatedPacketLoss(enabled bool)
